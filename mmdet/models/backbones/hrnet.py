@@ -320,12 +320,18 @@ class HighResolutionNet(nn.Module):
         self.stage4_cfg = self.extra['stage4']
         num_channels = self.stage4_cfg['num_channels']
         block_type = self.stage4_cfg['block']
-
+        
         block = blocks_dict[block_type]
         num_channels = [num_channels[i] * block.expansion for i in range(len(num_channels))]
         self.transition3 = self._make_transition_layer(pre_stage_channels, num_channels)
         self.stage4, pre_stage_channels = self._make_stage(self.stage4_cfg, num_channels)
 
+        #Add shift in Stage4
+        self.shift = self.extra['shift']
+        if self.shift['is_shift']:
+            temporal_shift.make_temporal_shift(self.stage4,self.shift['num_segments'],
+            n_div=self.shift['shift_div'], place=self.shift['shift_place'])
+    
     def _make_transition_layer(
             self, num_channels_pre_layer, num_channels_cur_layer):
         num_branches_cur = len(num_channels_cur_layer)
@@ -422,6 +428,18 @@ class HighResolutionNet(nn.Module):
     def init_weights(self, pretrained=None):
         if isinstance(pretrained, str):
             logger = logging.getLogger()
+            #modified
+            #change the key name in the checkpoint and load it back
+            replace_dict = []
+            sd =torch.load(pretrained)
+            model_dict = self.state_dict()
+            for k, v in sd.items():
+              if k not in model_dict and k[:6] == 'stage4': 
+                replace_dict.append((k, k.replace('.conv1', '.conv1.net')))
+                for k, k_new in replace_dict:
+                    sd[k_new] = sd.pop(k)
+                torch.save(sd,pretrained)
+            
             load_checkpoint(self, pretrained, strict=False, logger=logger)
         elif pretrained is None:
             for m in self.modules():
