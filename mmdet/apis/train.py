@@ -35,6 +35,7 @@ def parse_losses(losses):
 
 def batch_processor(model, data, train_mode):
     losses = model(**data)
+    #losses = model(*data)
     loss, log_vars = parse_losses(losses)
 
     outputs = dict(
@@ -71,7 +72,7 @@ def _dist_train(model, dataset, cfg, validate=False):
             dataset,
             cfg.data.imgs_per_gpu,
             cfg.data.workers_per_gpu,
-            pad_size=pad_size,
+            pad_size=pad_size,num_segments=cfg.data.num_segments,
             dist=True)
     ]
     # put model on gpus

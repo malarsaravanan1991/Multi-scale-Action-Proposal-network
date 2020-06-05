@@ -18,6 +18,7 @@ def weighted_cross_entropy(pred, label, weight, avg_factor=None, reduce=True):
         return torch.sum(raw * weight)[None] / avg_factor
     else:
         return raw * weight / avg_factor
+        
 
 
 def weighted_binary_cross_entropy(pred, label, weight, avg_factor=None):

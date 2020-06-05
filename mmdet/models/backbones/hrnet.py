@@ -31,6 +31,10 @@ from mmcv.runner import load_checkpoint
 import torch.nn.functional as F
 from ..registry import BACKBONES
 
+
+from . import temporal_shift
+import torch
+
 BatchNorm2d = nn.BatchNorm2d
 
 BN_MOMENTUM = 0.1

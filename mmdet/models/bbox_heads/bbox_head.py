@@ -3,7 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from mmdet.core import (delta2bbox, multiclass_nms, bbox_target,
-                        weighted_cross_entropy, weighted_smoothl1, accuracy)
+                        weighted_cross_entropy,weighted_binary_cross_entropy,
+                        weighted_smoothl1, accuracy)
 from ..registry import HEADS
 
 
@@ -90,9 +91,18 @@ class BBoxHead(nn.Module):
              reduce=True):
         losses = dict()
         if cls_score is not None:
-            losses['loss_cls'] = weighted_cross_entropy(
+            if len(labels.shape)==1:
+                #"Multi Class"
+                losses['loss_cls'] = weighted_cross_entropy(
                 cls_score, labels, label_weights, reduce=reduce)
-            losses['acc'] = accuracy(cls_score, labels)
+                losses['acc'] = accuracy(cls_score, labels)
+            else:
+               #"Multi label"
+               label_weights = (label_weights.view(-1,1)).repeat(1,labels.shape[1])
+               losses['loss_cls'] = weighted_binary_cross_entropy(
+                cls_score, labels, label_weights)
+               #losses['acc'] = 0
+            
         if bbox_pred is not None:
             losses['loss_reg'] = weighted_smoothl1(
                 bbox_pred,

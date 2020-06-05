@@ -140,9 +140,19 @@ class MaxIoUAssigner(BaseAssigner):
                     assigned_gt_inds[gt_argmax_overlaps[i]] = i + 1
 
         if gt_labels is not None:
-            assigned_labels = assigned_gt_inds.new_zeros((num_bboxes, ))
-            pos_inds = torch.nonzero(assigned_gt_inds > 0).squeeze()
-            if pos_inds.numel() > 0:
+            if len(gt_labels.shape) == 1 :
+            #"multi -class "
+             assigned_labels = assigned_gt_inds.new_zeros((num_bboxes, ))
+             pos_inds = torch.nonzero(assigned_gt_inds > 0).squeeze()
+             if pos_inds.numel() > 0:
+                assigned_labels[pos_inds] = gt_labels[
+                    assigned_gt_inds[pos_inds] - 1]
+            #"multi-label"
+            else:
+             assigned_labels = assigned_gt_inds.new_zeros((num_bboxes, \
+                gt_labels.shape[1]))
+             pos_inds = torch.nonzero(assigned_gt_inds > 0).squeeze()
+             if pos_inds.numel() > 0:
                 assigned_labels[pos_inds] = gt_labels[
                     assigned_gt_inds[pos_inds] - 1]
         else:
