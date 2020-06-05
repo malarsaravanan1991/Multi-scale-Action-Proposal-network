@@ -71,3 +71,30 @@ def collate(batch, samples_per_gpu=1, pad_size=None):
         }
     else:
         return default_collate(batch)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def collate_copy(batch, samples_per_gpu=1, pad_size=None):
+    """
+     Input : batch -dimension imgs_per_gpu x num_segments
+     Output: batch_data dimension
+    """
+    batch_data = []
+    for i in range(len(batch)):
+        batch_data.extend(batch[i]) 
+    return collate(batch_data,samples_per_gpu,pad_size)
