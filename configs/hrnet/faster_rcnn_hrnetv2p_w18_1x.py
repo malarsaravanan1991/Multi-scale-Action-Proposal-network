@@ -4,6 +4,7 @@ model = dict(
     pretrained='hrnetv2_pretrained/hrnetv2_w18_imagenet_pretrained.pth',
     backbone=dict(
         type='HighResolutionNet',
+        frozen_stages = 1,
         extra=dict(
             stage1=dict(
                 num_modules=1,
@@ -34,8 +35,8 @@ model = dict(
                 num_channels=(18, 36, 72, 144),
                 fuse_method='SUM'),
             shift=dict(
-                num_segments = 6,
-                shift_div = 6,
+                num_segments = 8,
+                shift_div = 8,
                 shift_place = 'blockres',
                 is_shift = 'True'))),
     neck=dict(
@@ -63,7 +64,7 @@ model = dict(
         in_channels=256,
         fc_out_channels=1024,
         roi_feat_size=7,
-        num_classes=40,
+        num_classes=30,
         target_means=[0., 0., 0., 0.],
         target_stds=[0.1, 0.1, 0.2, 0.2],
         reg_class_agnostic=False))
@@ -110,7 +111,7 @@ test_cfg = dict(
         nms_thr=0.7,
         min_bbox_size=0),
     rcnn=dict(
-        score_thr=0.05, nms=dict(type='nms', iou_thr=0.5), max_per_img=100)
+        score_thr=0.05, nms=dict(type='nms', iou_thr=0.5), max_per_img=15)
     # soft-nms is also supported for rcnn testing
     # e.g., nms=dict(type='soft_nms', iou_thr=0.5, min_score=0.05)
 )
@@ -130,7 +131,7 @@ img_norm_cfg = dict(
 data = dict(
     imgs_per_gpu=1,
     workers_per_gpu=0,
-    num_segments = 6,
+    num_segments = 8,
     train=dict(
         type=dataset_type,
         #ann_file=data_root + 'annotations/instances_train2017.json',
@@ -148,7 +149,7 @@ data = dict(
         uniform_sample=True,
         random_sample=False,
         strided_sample=False,
-        num_segments = 6),
+        num_segments = 8),
     val=dict(
         type=dataset_type,
         #ann_file=data_root + 'annotations/instances_val2017.json',
@@ -166,7 +167,7 @@ data = dict(
         uniform_sample=True,
         random_sample=False,
         strided_sample=False,
-        num_segments = 6),
+        num_segments = 8),
     test=dict(
         type=dataset_type,
         #ann_file=data_root + 'annotations/instances_val2017.json',
@@ -184,11 +185,11 @@ data = dict(
         uniform_sample=True,
         random_sample=False,
         strided_sample=False,
-        num_segments = 6))
+        num_segments = 8))
 # optimizer
 # if you use 8 GPUs for training, please change lr to 0.02
 optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
-optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
+optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2),acc_step=5)
 # learning policy
 lr_config = dict(
     policy='step',
@@ -209,7 +210,8 @@ log_config = dict(
 total_epochs = 12
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/faster_rcnn_hrnetv2p_w18_1x'
+work_dir = './work_dirs/test_run_8'
+#work_dir = './work_dirs/coco'
 load_from = None
 resume_from = None
-workflow = [('train', 3)]
+workflow = [('train', 1)]
