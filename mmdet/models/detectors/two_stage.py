@@ -160,12 +160,21 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
         assert self.with_bbox, "Bbox head must be implemented."
 
         x = self.extract_feat(img)
-
+        batch_size = img.shape[0]
         proposal_list = self.simple_test_rpn(
             x, img_meta, self.test_cfg.rpn) if proposals is None else proposals
 
         det_bboxes, det_labels = self.simple_test_bboxes(
             x, img_meta, proposal_list, self.test_cfg.rcnn, rescale=rescale)
+        '''if batch_size > 1 :
+            #"Eval modified for video action detection"    
+            bbox_results = []
+            det_bboxes = det_bboxes.view(batch_size,-1,5)
+            det_labels = det_labels.view(batch_size,-1)
+            for i in range(batch_size):
+                bbox_results += bbox2result(det_bboxes[i], det_labels[i],
+                                   self.bbox_head.num_classes)
+        else:'''
         bbox_results = bbox2result(det_bboxes, det_labels,
                                    self.bbox_head.num_classes)
 

@@ -121,7 +121,10 @@ class BBoxHead(nn.Module):
                        cfg=None):
         if isinstance(cls_score, list):
             cls_score = sum(cls_score) / float(len(cls_score))
-        scores = F.softmax(cls_score, dim=1) if cls_score is not None else None
+        if cls_score.shape[0] == '2000':
+            scores = F.softmax(cls_score, dim=1) if cls_score is not None else None
+        else:
+            scores = F.sigmoid(cls_score) if cls_score is not None else None
 
         if bbox_pred is not None:
             bboxes = delta2bbox(rois[:, 1:], bbox_pred, self.target_means,
@@ -135,8 +138,22 @@ class BBoxHead(nn.Module):
 
         if cfg is None:
             return bboxes, scores
-        else:
-            det_bboxes, det_labels = multiclass_nms(
+        else:#do batch size
+            if scores.shape[0] != '2000':
+                batch_size = scores.shape[0] // 2000
+                bbox = bboxes.view(batch_size,-1,bboxes.shape[1])
+                score = scores.view(batch_size,-1,scores.shape[1])
+                temp_box =[]
+                temp_labels = []
+                for i in range(batch_size): 
+                    det_box, det_label = multiclass_nms(
+                    bbox[i], score[i], cfg.score_thr, cfg.nms, cfg.max_per_img)
+                    temp_box.append(det_box)
+                    temp_labels.append(det_label)
+                det_bboxes = torch.cat(temp_box,0)
+                det_labels = torch.cat(temp_labels,0)
+            else:
+                det_bboxes, det_labels = multiclass_nms(
                 bboxes, scores, cfg.score_thr, cfg.nms, cfg.max_per_img)
 
             return det_bboxes, det_labels

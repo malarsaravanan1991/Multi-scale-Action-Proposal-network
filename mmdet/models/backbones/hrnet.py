@@ -332,7 +332,7 @@ class HighResolutionNet(nn.Module):
 
         #Add shift in Stage4
         self.shift = self.extra['shift']
-        if self.shift['is_shift']:
+        if self.shift['is_shift'] == "True":
             temporal_shift.make_temporal_shift(self.stage4,self.shift['num_segments'],
             n_div=self.shift['shift_div'], place=self.shift['shift_place'])
     
@@ -440,9 +440,9 @@ class HighResolutionNet(nn.Module):
             for k, v in sd.items():
               if k not in model_dict and k[:6] == 'stage4': 
                 replace_dict.append((k, k.replace('.conv1', '.conv1.net')))
-                for k, k_new in replace_dict:
+            for k, k_new in replace_dict:
                     sd[k_new] = sd.pop(k)
-                torch.save(sd,pretrained)
+            torch.save(sd,pretrained)
             
             load_checkpoint(self, pretrained, strict=False, logger=logger)
         elif pretrained is None:
