@@ -43,15 +43,25 @@ def allreduce_grads(model, coalesce=True, bucket_size_mb=-1):
 
 class DistOptimizerHook(OptimizerHook):
 
-    def __init__(self, grad_clip=None, coalesce=True, bucket_size_mb=-1):
+    def __init__(self, grad_clip=None, coalesce=True, bucket_size_mb=-1,acc_step = -1):
         self.grad_clip = grad_clip
         self.coalesce = coalesce
         self.bucket_size_mb = bucket_size_mb
+        self.acc_step = acc_step
+        #self.iter = 0
 
     def after_train_iter(self, runner):
-        runner.optimizer.zero_grad()
+        #Added Gradient accumulation
+        #runner.optimizer.zero_grad()
+
+        runner.outputs['loss'] = runner.outputs['loss'] / self.acc_step
         runner.outputs['loss'].backward()
         allreduce_grads(runner.model, self.coalesce, self.bucket_size_mb)
+
         if self.grad_clip is not None:
             self.clip_grads(runner.model.parameters())
-        runner.optimizer.step()
+        
+        if (runner.iter+1) % self.acc_step == 0:
+            runner.optimizer.step()
+            runner.optimizer.zero_grad()
+            

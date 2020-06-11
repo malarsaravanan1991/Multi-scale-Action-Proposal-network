@@ -64,13 +64,22 @@ class DistEvalHook(Hook):
         if not self.every_n_epochs(runner, self.interval):
             return
         runner.model.eval()
+        #batch_data = []
         results = [None for _ in range(len(self.dataset))]
+        #results = [None for _ in range(2)]
         prog_bar = mmcv.ProgressBar(len(self.dataset))
         for idx in range(runner.rank, len(self.dataset), runner.world_size):
+        #for idx in range(runner.rank, 2, runner.world_size):
             data = self.dataset[idx]
-            data_gpu = scatter(
-                collate([data], samples_per_gpu=1),
+            #change here
+            if isinstance (data,list) :
+                data_gpu = scatter(
+                collate(data, samples_per_gpu=len(data)),
                 [torch.cuda.current_device()])[0]
+            else:
+                data_gpu = scatter(
+                  collate([data], samples_per_gpu=1),
+                  [torch.cuda.current_device()])[0]
 
             # compute output
             with torch.no_grad():
@@ -108,26 +117,34 @@ class DistEvalmAPHook(DistEvalHook):
     def evaluate(self, runner, results):
         gt_bboxes = []
         gt_labels = []
-        gt_ignore = [] if self.dataset.with_crowd else None
-        for i in range(len(self.dataset)):
-            ann = self.dataset.get_ann_info(i)
-            bboxes = ann['bboxes']
-            labels = ann['labels']
-            if gt_ignore is not None:
-                ignore = np.concatenate([
-                    np.zeros(bboxes.shape[0], dtype=np.bool),
-                    np.ones(ann['bboxes_ignore'].shape[0], dtype=np.bool)
-                ])
-                gt_ignore.append(ignore)
-                bboxes = np.vstack([bboxes, ann['bboxes_ignore']])
-                labels = np.concatenate([labels, ann['labels_ignore']])
-            gt_bboxes.append(bboxes)
-            gt_labels.append(labels)
-        # If the dataset is VOC2007, then use 11 points mAP evaluation.
-        if hasattr(self.dataset, 'year') and self.dataset.year == 2007:
-            ds_name = 'voc07'
+        if self.dataset.num_segments :
+            gt_ignore = None
+            for i in range(len(self.dataset)):
+            #for i in range(2):
+                bboxes,labels = self.dataset.get_ann_info(i)
+                gt_bboxes.append(bboxes)
+                gt_labels.append(labels)
+            assert len(gt_bboxes) == len(gt_labels)
         else:
-            ds_name = self.dataset.CLASSES
+            gt_ignore = [] if self.dataset.with_crowd else None
+            for i in range(len(self.dataset)):
+                ann = self.dataset.get_ann_info(i)
+                bboxes = ann['bboxes']
+                labels = ann['labels']
+                if gt_ignore is not None:
+                    ignore = np.concatenate([
+                    np.zeros(bboxes.shape[0], dtype=np.bool),
+                    np.ones(ann['bboxes_ignore'].shape[0], dtype=np.bool)])
+                    gt_ignore.append(ignore)
+                    bboxes = np.vstack([bboxes, ann['bboxes_ignore']])
+                    labels = np.concatenate([labels, ann['labels_ignore']])
+                gt_bboxes.append(bboxes)
+                gt_labels.append(labels)
+            # If the dataset is VOC2007, then use 11 points mAP evaluation.
+        if hasattr(self.dataset, 'year') and self.dataset.year == 2007:
+                ds_name = 'voc07'
+        else:
+                ds_name = self.dataset.CLASSES
         mean_ap, eval_results = eval_map(
             results,
             gt_bboxes,

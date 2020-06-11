@@ -198,6 +198,37 @@ def tpfp_default(det_bboxes, gt_bboxes, gt_ignore, iou_thr, area_ranges=None):
                     fp[k, i] = 1
     return tp, fp
 
+def get_cls_results_action(det_results, gt_bboxes, gt_labels, gt_ignore, class_id
+                          ,batch_size):
+    """Get det results and gt information of a certain class."""
+    cls_dets = []
+    num_class = len(det_results[0]) // batch_size
+    for det in det_results:
+        all_det = [np.asarray(det[class_id + i],dtype=np.float32) for i in range(0,len(det),num_class)]
+        cls_dets.append(np.concatenate(all_det,0))
+        
+        '''d_batch = [det[batch*num_class:batch*num_class+num_class] for batch in range(batch_size)]
+        for batch in range(batch_size):
+            if len(d_batch[batch][class_id]) > 0:
+                #detection is available
+                cls_dets.append(np.asarray(d_batch[batch][class_id],dtype=np.float32))  # det bboxes of this class
+        if len(cls_dets) == 0:
+            cls_dets.append'''
+    cls_gts = []  # gt bboxes of this class
+    cls_gt_ignore = []
+    for j in range(len(gt_bboxes)):
+            gt_bbox = gt_bboxes[j]
+            cls_inds = (gt_labels[j][:,class_id+1] == 1)
+            #cls_inds = (gt_labels[j] == class_id + 1)
+            cls_gt = gt_bbox[cls_inds, :] if gt_bbox.shape[0] > 0 else gt_bbox
+            cls_gts.append(cls_gt)
+            if gt_ignore is None:
+                cls_gt_ignore.append(np.zeros(cls_gt.shape[0], dtype=np.int32))
+            else:
+                cls_gt_ignore.append(gt_ignore[j][cls_inds])
+    return cls_dets, cls_gts, cls_gt_ignore
+
+
 
 def get_cls_results(det_results, gt_bboxes, gt_labels, gt_ignore, class_id):
     """Get det results and gt information of a certain class."""
@@ -207,7 +238,10 @@ def get_cls_results(det_results, gt_bboxes, gt_labels, gt_ignore, class_id):
     cls_gt_ignore = []
     for j in range(len(gt_bboxes)):
         gt_bbox = gt_bboxes[j]
-        cls_inds = (gt_labels[j] == class_id + 1)
+        if gt_labels[j].ndim > 1:
+            cls_inds = (gt_labels[j][:,class_id] == 1)
+        else :
+            cls_inds = (gt_labels[j] == class_id + 1)
         cls_gt = gt_bbox[cls_inds, :] if gt_bbox.shape[0] > 0 else gt_bbox
         cls_gts.append(cls_gt)
         if gt_ignore is None:
@@ -253,11 +287,10 @@ def eval_map(det_results,
     num_scales = len(scale_ranges) if scale_ranges is not None else 1
     eval_results = []
     num_classes = len(det_results[0])  # positive class num
-    gt_labels = [
-        label if label.ndim == 1 else label[:, 0] for label in gt_labels
-    ]
+    #gt_labels = [
+    #    label if label.ndim == 1 else label[:, 0] for label in gt_labels
+    #    ]
     for i in range(num_classes):
-        # get gt and det bboxes of this class
         cls_dets, cls_gts, cls_gt_ignore = get_cls_results(
             det_results, gt_bboxes, gt_labels, gt_ignore, i)
         # calculate tp and fp for each image
@@ -320,7 +353,7 @@ def eval_map(det_results,
     else:
         aps = []
         for cls_result in eval_results:
-            if cls_result['num_gts'] > 0:
+            #if cls_result['num_gts'] > 0:
                 aps.append(cls_result['ap'])
         mean_ap = np.array(aps).mean().item() if aps else 0.0
     if print_summary:
