@@ -44,92 +44,6 @@ class VideoRecord(object):
     def width(self):
         return int(self._data[3])
 
-activity2id_hard = {
-    "BG": 0,  # background
-    "activity_gesturing": 1,
-    "Closing": 2,
-    "Opening": 3,
-    "Interacts": 4,
-    "Exiting": 5,
-    "Entering": 6,
-    "Talking": 7,
-    "Transport_HeavyCarry": 8,
-    "Unloading": 9,
-    "Pull": 10,
-    "Loading": 11,
-    "Open_Trunk": 12,
-    "Closing_Trunk": 13,
-    "Riding": 14,
-    "specialized_texting_phone": 15,
-    "Person_Person_Interaction": 16,
-    "specialized_talking_phone": 17,
-    "activity_running": 18,
-    "PickUp": 19,
-    "specialized_using_tool": 20,
-    "SetDown": 21,
-    "activity_crouching": 22,
-    "activity_sitting": 23,
-    "Object_Transfer": 24,
-    "Push": 25,
-    "PickUp_Person_Vehicle": 26
-    }
-    
-
-activity2id = {
-    "BG": 0,  # background
-    "activity_walking": 1,
-    "activity_standing": 2,
-    "activity_carrying": 3,
-    "activity_gesturing": 4,
-    "Closing": 5,
-    "Opening": 6,
-    "Interacts": 7,
-    "Exiting": 8,
-    "Entering": 9,
-    "Talking": 10,
-    "Transport_HeavyCarry": 11,
-    "Unloading": 12,
-    "Pull": 13,
-    "Loading": 14,
-    "Open_Trunk": 15,
-    "Closing_Trunk": 16,
-    "Riding": 17,
-    "specialized_texting_phone": 18,
-    "Person_Person_Interaction": 19,
-    "specialized_talking_phone": 20,
-    "activity_running": 21,
-    "PickUp": 22,
-    "specialized_using_tool": 23,
-    "SetDown": 24,
-    "activity_crouching": 25,
-    "activity_sitting": 26,
-    "Object_Transfer": 27,
-    "Push": 28,
-    "PickUp_Person_Vehicle": 29,
-    "vehicle_turning_right": 30,
-    "vehicle_moving": 31,
-    "vehicle_stopping" : 32,
-    "vehicle_starting" :33,
-    "vehicle_turning_left": 34,
-    "vehicle_u_turn": 35,
-    "specialized_miscellaneous": 36,
-    "DropOff_Person_Vehicle" : 37,
-    "Misc" : 38,
-    "Drop" : 39}
-CLASSES = ('BG','activity_walking','activity_standing',
-    'activity_carrying','activity_gesturing','Closing',
-    'Opening','Interacts','Exiting','Entering','Talking',
-    'Transport_HeavyCarry','Unloading','Pull','Loading',
-    'Open_Trunk','Closing_Trunk','Riding','specialized_texting_phone',
-    'Person_Person_Interaction','specialized_talking_phone',
-    'activity_running','PickUp','specialized_using_tool',
-    'SetDown','activity_crouching','activity_sitting',
-    'Object_Transfer','Push','PickUp_Person_Vehicle',
-    'vehicle_turning_right','vehicle_moving','vehicle_stopping',
-    'vehicle_starting','vehicle_turning_left','vehicle_u_turn',
-    'specialized_miscellaneous','DropOff_Person_Vehicle','Misc',
-    'Drop')
-
 #@DATASETS.register_module()
 class VIRAT_dataset(CustomDataset):
     def __init__(self, ann_file,
@@ -166,13 +80,7 @@ class VIRAT_dataset(CustomDataset):
             self.proposals = self.load_proposals(proposal_file)
         else:
             self.proposals = None
-        # filter images with no annotation during training
-        '''if not test_mode:
-            valid_inds = self._filter_imgs()
-            self.img_infos = [self.img_infos[i] for i in valid_inds]
-            if self.proposals is not None:
-                self.proposals = [self.proposals[i] for i in valid_inds]'''
-
+        
         # (long_edge, short_edge) or [(long1, short1), (long2, short2), ...]
         self.img_scales = img_scale if isinstance(img_scale,
                                                   list) else [img_scale]
@@ -210,6 +118,9 @@ class VIRAT_dataset(CustomDataset):
         # image rescale if keep ratio
         self.resize_keep_ratio = resize_keep_ratio
 
+        #validation ann info
+        self.val_frame_ind = []
+        self.val_gt_path = []
         
 
     def _parse_list(self):
@@ -258,77 +169,16 @@ class VIRAT_dataset(CustomDataset):
         else:
             offsets = np.zeros((self.num_segments,))    
             return offsets  
-
-    def get(self,index,record, indices):
-      
-      sequence_path = str(record.path).strip().split('/frames/')[0]
-      label = list()
-      bbox = list()
-      images = list()
-      img_path = list()
-      gt = np.zeros((len(indices),self.cfg.MAX_NUM_GT_BOXES,(self.num_class + 4)),
-                  dtype=np.float32)
-      num_boxes = np.zeros((self.num_segments),dtype=np.float32)
-      im_info = np.zeros((self.num_segments,3),dtype=np.float32)
-      npy_file = (os.path.join(str(sequence_path),'ground_truth.npy'))
-      data = np.load(npy_file)
-      frame = data[0][0]
-      j =0 
-      for seg_ind in indices: #iterate through every image
-                    count = 0
-                    
-                    bboxes = np.zeros((self.cfg.MAX_NUM_GT_BOXES,(self.num_class + 4)),dtype= float)
-                    p = int(seg_ind) + int(frame)
-                    image_path = os.path.join(record.path, '{:06d}.jpg'.format(p))
-                    im = imread(image_path)
-                    im = im[:,:,::-1]
-                    im = im.astype(np.float32, copy=False)
-                    height,width,_= im.shape #h=1080,w=1920
-                    im_size_min= min(height,width)
-                    im_size_max = max(height,width)
-                    im_scale = float(self.new_size) / float(im_size_min)
-                    im = cv2.resize(im, None, None, fx=im_scale, fy=im_scale,
-                    interpolation=cv2.INTER_LINEAR)
-                    im_info[j,:]=self.new_size,len(im[2]),im_scale
-                    img_path.append(image_path)
-                    for i in data:
-                        if i[0] == p:
-                            bbox_new =[]
-                            bbox = (i[2:6])*im_scale
-                            bbox_new[0:4] = bbox
-                            #change to train only hard class
-                            #bbox_new[4:] = i[6:7]
-                            #bbox_new[5:] = i[10:10+self.num_class -1]
-                            bbox_new[4:]=i[6:6+self.num_class]#change here to train only less hard class
-                            bboxes[count,:]+=bbox_new
-                            count+=1
-                            
-                    num_boxes[j,]+=count
-                    gt[j,:,:] = bboxes
-                    j = j+1     
-                    images.append(im)
-      
-      max_shape = np.array([imz.shape for imz in images]).max(axis=0)
-      num_images = len(images)
-      blob = np.zeros((num_images, max_shape[0], max_shape[1], 3),
-                    dtype=np.float32)
-      for i in range(len(images)):
-        im1 = images[i]
-        blob[i,0:im1.shape[0], 0:im1.shape[1], :] = im1
-
-
-      process_data = self.transform(blob)
-      return process_data, gt, num_boxes , im_info ,img_path
-
-                          
-    '''def __getitem__(self, index):
-        record = self.video_list[index]
-        #self.yaml_file(index)
-        segment_indices = self._sample_indices(record)
-        segment_indices = np.sort(segment_indices)
-        return self.get( index, record, segment_indices)'''
-    
-               
+    CLASSES = ('activity_walking','activity_standing',
+                    'activity_carrying','activity_gesturing','Closing',
+                    'Opening','Interacts','Exiting','Entering','Talking',
+                    'Transport_HeavyCarry','Unloading','Pull','Loading',
+                    'Open_Trunk','Closing_Trunk','Riding','specialized_texting_phone',
+                    'Person_Person_Interaction','specialized_talking_phone',
+                    'activity_running','PickUp','specialized_using_tool',
+                    'SetDown','activity_crouching','activity_sitting',
+                    'Object_Transfer','Push','PickUp_Person_Vehicle',
+                    'BG')
     def __len__(self):
         return (len(self.video_list))
 
@@ -381,8 +231,9 @@ class VIRAT_dataset(CustomDataset):
 
             for dat in range(len(gt_data)):
                 if gt_data[dat][0] == p:
+                    #append last column with BG labels
                     gt_bboxes.append(list(gt_data[dat][2:6]))
-                    gt_labels.append(list(gt_data[dat][6:]))
+                    gt_labels.append(list(np.append(gt_data[dat][7:7+len(self.CLASSES)-1],gt_data[dat][6:7])))
             gt_bboxes = np.asarray(gt_bboxes,dtype=np.float32)
             gt_labels = np.asarray(gt_labels,dtype=np.int64)
             #gt_bboxes = [data[i][2:6] for i in range(len(data)) if data[i][0] == p]
@@ -433,8 +284,98 @@ class VIRAT_dataset(CustomDataset):
             fin_data.append(data)
         return fin_data
 
+    def prepare_test_img(self, idx):
+        """Prepare an image for testing (multi-scale and flipping)"""
+        record = self.video_list[idx]
+        segment_indices = self._sample_indices(record)
+        segment_indices = np.sort(segment_indices)
+        
+        frame = ((record.path).split('/')[8]).split('_')[0]
+        sequence_path = str(record.path).strip().split('/frames/')[0]
 
+        #create run time info for annotation
+        npy_file = (os.path.join(str(sequence_path),'ground_truth.npy'))
+        self.val_gt_path.append(npy_file)
+        self.val_frame_ind.append(segment_indices)
 
-#parse the yml file into the variables
+        fin_data = []
+        
+        for i in segment_indices:
+            p = int(i) + int(frame)
+        
+            #img_info = self.img_infos[idx]
+            # load image
+            img = mmcv.imread(os.path.join(record.path,'{:06d}.jpg'.format(p)))
+            #img = mmcv.imread(osp.join(self.img_prefix, img_info['filename']))
+            if self.proposals is not None:
+               proposal = self.proposals[idx][:self.num_max_proposals]
+               if not (proposal.shape[1] == 4 or proposal.shape[1] == 5):
+                raise AssertionError(
+                    'proposals should have shapes (n, 4) or (n, 5), '
+                    'but found {}'.format(proposal.shape))
+            else:
+               proposal = None
 
+            def prepare_single(img, scale, flip, proposal=None):
+              _img, img_shape, pad_shape, scale_factor = self.img_transform(
+                img, scale, flip, keep_ratio=self.resize_keep_ratio)
+              _img = to_tensor(_img)
+              _img_meta = dict(
+                ori_shape=(img.shape[0], img.shape[1], 3),
+                img_shape=img_shape,
+                pad_shape=pad_shape,
+                scale_factor=scale_factor,
+                flip=flip)
+              if proposal is not None:
+                if proposal.shape[1] == 5:
+                    score = proposal[:, 4, None]
+                    proposal = proposal[:, :4]
+                else:
+                    score = None
+                _proposal = self.bbox_transform(proposal, img_shape,
+                                                scale_factor, flip)
+                _proposal = np.hstack(
+                    [_proposal, score]) if score is not None else _proposal
+                _proposal = to_tensor(_proposal)
+              else:
+                _proposal = None
+              return _img, _img_meta, _proposal
+
+            imgs = []
+            img_metas = []
+            proposals = []
+            for scale in self.img_scales:
+                _img, _img_meta, _proposal = prepare_single(
+                   img, scale, False, proposal)
+                imgs.append(_img)
+                img_metas.append(DC(_img_meta, cpu_only=True))
+                proposals.append(_proposal)
+                if self.flip_ratio > 0:
+                    _img, _img_meta, _proposal = prepare_single(
+                       img, scale, True, proposal)
+                    imgs.append(_img)
+                    img_metas.append(DC(_img_meta, cpu_only=True))
+                    proposals.append(_proposal)
+            data = dict(img=imgs, img_meta=img_metas)
+            if self.proposals is not None:
+                data['proposals'] = proposals
+            fin_data. append(data)
+        return fin_data
+
+    def get_ann_info(self,idx):
+        val_data = np.load(self.val_gt_path[idx])
+        frame_idx_list = self.val_frame_ind[idx]
+        gt_bboxes = []
+        gt_labels = []
+        for frame in frame_idx_list:
+            p = int(val_data[0][0]) + int(frame)
+            for dat in range(len(val_data)):
+                if val_data[dat][0] == p:
+                    gt_bboxes.append(list(val_data[dat][2:6]))
+                    gt_labels.append(list(np.append(val_data[dat][7:7+len(self.CLASSES)-1],val_data[dat][6:7])))
+        assert len(gt_bboxes) == len(gt_labels)
+        gt_bboxes = np.asarray(gt_bboxes,dtype=np.float32)
+        gt_labels = np.asarray(gt_labels,dtype=np.int64)
+        return gt_bboxes,gt_labels
+        
 
